@@ -673,16 +673,7 @@ code --install-extension pkief.material-icon-theme \
     },
 
     // ===== Ruff =====
-    "ruff.showNotifications": "always",
-    "ruff.trace.server": "verbose",
-    "ruff.ignoreStandardLibrary": false,
-    "ruff.lint.run": "onType",
     "ruff.organizeImports": true,
-    "ruff.lint.args": [
-        "--select=ALL",
-        "--extend-select=UP",
-        "--fix"
-    ],
 
     // ===== JavaScript / TypeScript =====
     "[javascript]": {
