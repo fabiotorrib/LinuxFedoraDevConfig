@@ -1,35 +1,32 @@
-# LinuxFedoraDevConfig
-Linux ( Fedora ) System Configuration for Software Engineers
-
-# Fedora for devs : How to config
-
-Depois da instalação do Fedora para configurar drivers, apps básicos e outros utilitários, siga este tutorial:
+# Fedora for devs: How to configure
+Linux ( Fedora ) System Configuration for Software Engineers.
+After installing Fedora, to set up drivers, basic apps, and other utilities, follow this tutorial:  
 [GitHub - wz790/Fedora-Noble-Setup: Fedora Linux Noble Setup Guide (Post-Installation)](https://github.com/wz790/Fedora-Noble-Setup?tab=readme-ov-file)
 
-Para assinar drivers da NVIDIA sem precisar desativar o secure boot voce deve seguir as seguintes instruções:
+To sign NVIDIA drivers without disabling Secure Boot, follow these steps:
 
 ```bash
-# 1. Instalar ferramentas
+# 1. Install tools
 sudo dnf install -y mokutil openssl
 
-# 2. Criar chaves (pasta + gerar certificado)
+# 2. Create keys (folder + generate certificate)
 mkdir -p ~/nvidia-keys && cd ~/nvidia-keys
 openssl req -new -x509 -newkey rsa:2048 -keyout MOK.priv -outform DER -out MOK.der \
   -nodes -days 36500 -subj "/CN=My NVIDIA MOK/"
 openssl x509 -in MOK.der -inform DER -out MOK.pem -outform PEM
 
-# 3. Registrar chave no firmware (vai pedir senha para confirmar no boot)
+# 3. Register key in firmware (it will ask for a password to confirm at boot)
 sudo mokutil --import MOK.der
 sudo reboot
-# -> Tela azul MOK Manager: Enroll MOK > Continue > senha > reboot
+# -> Blue MOK Manager screen: Enroll MOK > Continue > password > reboot
 
-# 4. Assinar módulos da NVIDIA (.ko)
-modinfo -n nvidia   # mostra caminho do módulo
+# 4. Sign NVIDIA modules (.ko)
+modinfo -n nvidia   # shows the module path
 sudo /usr/src/kernels/$(uname -r)/scripts/sign-file sha256 \
   ~/nvidia-keys/MOK.priv ~/nvidia-keys/MOK.pem \
   /usr/lib/modules/$(uname -r)/extra/nvidia/*.ko
 
-# 5. Regenerar initramfs para carregar módulo assinado
+# 5. Regenerate initramfs so the signed module loads
 sudo dracut --force
 sudo reboot
 
@@ -40,125 +37,127 @@ nvidia-smi
 
 ---
 
-## PACOTES IMPORTANTES
+---
 
-#### Compilação & Toolchain
+## IMPORTANT PACKAGES
 
-Esses pacotes formam a **base de compilação e build** no Fedora. Incluem compiladores, linkers, sistemas de build e ferramentas para empacotar software.
+#### Compilation & Toolchain
 
-- **@development-tools** — Grupo com gcc, g++, make, etc.
+These packages are the **build and compilation base** on Fedora. They include compilers, linkers, build systems, and packaging tools.
+
+- **@development-tools** — Group with gcc, g++, make, etc.
   
-- **cmake / ninja-build** — Sistemas de build modernos.
+- **cmake / ninja-build** — Modern build systems.
   
-- **clang / clang-tools-extra** — Compilador C/C++ e ferramentas extras (clangd, clang-format).
+- **clang / clang-tools-extra** — C/C++ compiler and extra tools (clangd, clang-format).
   
-- **pkg-config** — Gerencia flags de compilação/links.
+- **pkg-config** — Manages compile/link flags.
   
-- **bear** — Gera `compile_commands.json` para IDEs.
+- **bear** — Generates `compile_commands.json` for IDEs.
   
-- **gdb** — Debugger para C/C++.
+- **gdb** — Debugger for C/C++.
   
-- **lcov** — Relatórios de cobertura de testes.
+- **lcov** — Test coverage reports.
   
-- **rpm-build / rpmdevtools** — Ferramentas para empacotar em RPM.
+- **rpm-build / rpmdevtools** — Tools to build RPM packages.
   
-- **rust** — adiciona a linguagem rust ao sistema
+- **rust** — Adds the Rust language to the system.
   
-- **cargo** — gerenciador de pacotes do rust
+- **cargo** — Rust’s package manager.
   
 
 ```bash
 sudo dnf install -y @development-tools cmake ninja-build clang clang-tools-extra pkg-config bear gdb lcov rpm-build rpmdevtools rust cargo
 ```
 
-#### Testes & Qualidade de Código
+#### Testing & Code Quality
 
-Frameworks e utilitários que ajudam a **garantir qualidade e estabilidade** do código.
+Frameworks and utilities that help **ensure code quality and stability**.
 
-- **boost-devel** — Inclui toda a biblioteca Boost.
+- **boost-devel** — Full Boost library headers.
   
-- **gtest-devel / gmock-devel** — Google Test e Google Mock para C++.
+- **gtest-devel / gmock-devel** — Google Test and Google Mock for C++.
   
-- **shellcheck** — Analisa scripts shell e aponta erros.
+- **shellcheck** — Analyzes shell scripts and flags common mistakes.
   
 
 ```bash
 sudo dnf install -y boost-devel gtest-devel gmock-devel shellcheck
 ```
 
-#### Debug, Profiling & Diagnóstico
+#### Debugging, Profiling & Diagnostics
 
-Ferramentas para **detectar vazamentos de memória, analisar performance e monitorar processos**.
+Tools to **detect memory leaks, analyze performance, and monitor processes**.
 
-- **valgrind** — Detecta erros de memória.
+- **valgrind** — Detects memory errors.
   
-- **strace / ltrace** — Traçam syscalls e chamadas de bibliotecas.
+- **strace / ltrace** — Trace syscalls and library calls.
   
-- **perf** — Perfilador de performance (via kernel-tools).
+- **perf** — Performance profiler (via kernel-tools).
   
-- **htop** — Monitor de processos interativo.
+- **htop** — Interactive process monitor.
   
 
 ```bash
 sudo dnf install -y valgrind strace ltrace perf htop
 ```
 
-#### Gráficos, Multimídia & 3D
+#### Graphics, Multimedia & 3D
 
-Bibliotecas para **jogos, simulações e aplicações gráficas**.
+Libraries for **games, simulations, and graphical apps**.
 
-- **mesa-libGLES-devel / mesa-libEGL-devel** — OpenGL ES e EGL.
+- **mesa-libGLES-devel / mesa-libEGL-devel** — OpenGL ES and EGL.
   
-- **glm-devel** — Matemática para gráficos 3D.
+- **glm-devel** — Math for 3D graphics.
   
-- **SDL2-devel / SDL2_image-devel** — Desenvolvimento com SDL2.
+- **SDL2-devel / SDL2_image-devel** — SDL2 development.
   
 
 ```bash
 sudo dnf install -y mesa-libGLES-devel mesa-libEGL-devel glm-devel SDL2-devel SDL2_image-devel
 ```
 
-#### Sistema, IPC & Serviços
+#### System, IPC & Services
 
-APIs e libs que permitem **interagir com o Linux e seus serviços**.
+APIs and libraries to **interact with Linux and its services**.
 
-- **dbus-devel** — Comunicação entre processos.
+- **dbus-devel** — Inter-process communication.
   
-- **systemd-devel** — Integração com o systemd.
+- **systemd-devel** — Integration with systemd.
   
-- **libcap-devel** — Permissões granulares de processos.
+- **libcap-devel** — Fine-grained process capabilities.
   
-- **expat-devel** — Parser XML rápido.
+- **expat-devel** — Fast XML parser.
   
-- **libuuid-devel** — Geração e manipulação de UUIDs.
+- **libuuid-devel** — Generate and handle UUIDs.
   
 
 ```bash
 sudo dnf install -y dbus-devel systemd-devel libcap-devel expat-devel libuuid-devel
 ```
 
-#### Containers & Virtualização
+#### Containers & Virtualization
 
-Ferramentas para **rodar ambientes isolados e simular máquinas**.
+Tools to **run isolated environments and virtual machines**.
 
-- **lxc / lxc-devel** — Containers Linux.
+- **lxc / lxc-devel** — Linux containers.
   
-- **podman** — Containers rootless (nativo no Fedora).
+- **podman** — Rootless containers (Fedora native).
   
-- **docker / docker-compose** — Containers clássicos (precisa repo extra).
+- **docker / docker-compose** — Classic containers (extra repo needed).
   
-- **vagrant** — Automação de VMs.
+- **vagrant** — VM automation.
   
-- **qemu-kvm / virt-manager** — Virtualização e interface gráfica.
+- **qemu-kvm / virt-manager** — Virtualization and GUI manager.
   
 
 ```bash
 sudo dnf install -y lxc lxc-devel podman vagrant qemu-kvm virt-manager
 ```
 
-#### Serialização & RPC
+#### Serialization & RPC
 
-Bibliotecas para **troca de dados eficiente entre sistemas**.
+Libraries for **efficient data exchange between systems**.
 
 - **protobuf-devel / protobuf-compiler** — Protocol Buffers.
 
@@ -166,38 +165,38 @@ Bibliotecas para **troca de dados eficiente entre sistemas**.
 sudo dnf install -y protobuf-devel protobuf-compiler
 ```
 
-#### Rede & CLI Web
+#### Networking & Web CLI
 
-Ferramentas para **testar APIs, monitorar rede e criptografia**.
+Tools to **test APIs, monitor networks, and handle cryptography**.
 
-- **curl / wget** — Clientes HTTP básicos.
+- **curl / wget** — Basic HTTP clients.
   
-- **httpie** — Cliente HTTP amigável.
+- **httpie** — Friendly HTTP client.
   
-- **nmap** — Scanner de rede.
+- **nmap** — Network scanner.
   
-- **wireshark / wireshark-cli** — Sniffer de pacotes.
+- **wireshark / wireshark-cli** — Packet sniffer.
   
-- **net-tools / iproute** — Ferramentas de rede.
+- **net-tools / iproute** — Network utilities.
   
-- **mosh** — SSH melhorado.
+- **mosh** — Resilient SSH.
   
-- **gnupg2** — Criptografia e assinatura digital.
+- **gnupg2** — Encryption and digital signatures.
   
 
 ```bash
 sudo dnf install -y curl wget httpie nmap wireshark wireshark-cli net-tools iproute mosh gnupg2
 ```
 
-#### Bancos de Dados & Armazenamento
+#### Databases & Storage
 
-Pacotes para **usar e integrar bancos de dados no desenvolvimento**.
+Packages to **use and integrate databases in development**.
 
 - **sqlite / sqlite-devel** — SQLite.
   
-- **postgresql / postgresql-devel** — Cliente PostgreSQL.
+- **postgresql / postgresql-devel** — PostgreSQL client.
   
-- **mariadb / mariadb-devel** — Cliente MySQL/MariaDB.
+- **mariadb / mariadb-devel** — MySQL/MariaDB client.
   
 - **redis / redis-devel** — Redis.
   
@@ -206,64 +205,64 @@ Pacotes para **usar e integrar bancos de dados no desenvolvimento**.
 sudo dnf install -y sqlite sqlite-devel postgresql postgresql-devel mariadb mariadb-devel redis redis-devel
 ```
 
-#### Desenvolvimento Python
+#### Python Development
 
-Ferramentas para **projetos Python modernos**.
+Tools for **modern Python projects**.
 
-- **python3-virtualenv / python3-venv** — Ambientes virtuais.
+- **python3-virtualenv / python3-venv** — Virtual environments.
   
-- **ipython** — REPL interativo.
+- **ipython** — Interactive REPL.
   
-- **jupyter-notebook / jupyterlab** — Notebooks científicos.
+- **jupyter-notebook / jupyterlab** — Scientific notebooks.
   
-- **mypy / black / flake8 / isort** — Linters e formatadores.
+- **mypy / black / flake8 / isort** — Linters and formatters.
   
 - **tk-devel** — Tkinter (GUIs).
   
-- **bzip2-devel, gdbm-devel, libffi-devel, xz-devel, ncurses-devel, readline-devel, sqlite-devel, zlib-devel, openssl-devel** — Dependências C usadas pelo Python.
+- **bzip2-devel, gdbm-devel, libffi-devel, xz-devel, ncurses-devel, readline-devel, sqlite-devel, zlib-devel, openssl-devel** — C deps used by Python.
   
 
 ```bash
 sudo dnf install -y python3-virtualenv python3-venv ipython jupyter-notebook jupyterlab mypy black flake8 isort tk-devel bzip2-devel gdbm-devel libffi-devel xz-devel ncurses-devel readline-devel sqlite-devel zlib-devel openssl-devel
 ```
 
-### Documentação & Diagramas
+#### Documentation & Diagrams
 
-Ferramentas para **gerar documentação e diagramas automáticos**.
+Tools to **generate documentation and diagrams automatically**.
 
-- **doxygen** — Documentação C/C++.
+- **doxygen** — C/C++ documentation.
   
-- **graphviz** — Diagramas de grafos.
+- **graphviz** — Graph diagrams.
   
-- **pandoc** — Conversão de documentos.
+- **pandoc** — Document conversion.
   
 
 ```bash
 sudo dnf install -y doxygen graphviz pandoc
 ```
 
-#### Produtividade no Terminal
+#### Terminal Productivity
 
-Pacotes que **tornam o terminal mais rápido e prático**.
+Packages that **make the terminal faster and more convenient**.
 
-- **fzf** — Busca fuzzy interativa.
+- **fzf** — Interactive fuzzy search.
   
-- **ripgrep** — Grep moderno e veloz.
+- **ripgrep** — Modern, fast grep.
   
-- **bat** — Cat com highlight.
+- **bat** — `cat` with syntax highlighting.
   
-- **exa** — ls melhorado com cores e árvore.
+- **exa** — Improved `ls` with colors and tree.
   
-- **unzip** — Extrair arquivos ZIP.
+- **unzip** — Extract ZIP archives.
   
 
 ```bash
 sudo dnf install -y fzf ripgrep bat exa unzip
 ```
 
-## Linha única com tudo
+## One-liner with everything
 
-> Instala todos os pacotes de uma vez (exceto Docker, PlantUML e MongoDB que podem precisar de repositórios extras).
+> Installs all packages at once (except Docker, PlantUML, and MongoDB, which may require extra repositories).
 
 ```bash
 sudo dnf install -y \ @development-tools cmake ninja-build clang clang-tools-extra pkg-config bear gdb lcov rpm-build rpmdevtools \ boost-devel gtest-devel gmock-devel shellcheck \ valgrind strace ltrace perf htop \ mesa-libGLES-devel mesa-libEGL-devel glm-devel SDL2-devel SDL2_image-devel xorg-x11-utils \ dbus-devel systemd-devel libcap-devel expat-devel libuuid-devel \ lxc lxc-devel podman vagrant qemu-kvm virt-manager \ protobuf-devel protobuf-compiler \ curl wget httpie nmap wireshark wireshark-cli net-tools iproute mosh gnupg2 \ sqlite sqlite-devel postgresql postgresql-devel mariadb mariadb-devel redis redis-devel \ python3-virtualenv python3-venv ipython jupyter-notebook jupyterlab mypy black flake8 isort tk-devel \ bzip2-devel gdbm-devel libffi-devel xz-devel ncurses-devel readline-devel sqlite-devel zlib-devel openssl-devel \ doxygen graphviz pandoc \ fzf ripgrep bat exa unzip
@@ -273,7 +272,7 @@ sudo dnf install -y \ @development-tools cmake ninja-build clang clang-tools-ext
 
 ## Anaconda, VSCode, uv and VTM
 
-Este script instala três ferramentas populares no Fedora: **Anaconda**, que fornece um ambiente completo de Python com bibliotecas de ciência de dados; **VTM**, um gerenciador de terminais que pode ser instalado via Cargo (necessita do Rust instalado previamente); e **Visual Studio Code**, editor de código moderno da Microsoft.
+This script installs three popular tools on Fedora: **Anaconda**, which provides a complete Python environment with data-science libraries; **VTM**, a terminal manager that can be installed via Cargo (requires Rust installed beforehand); and **Visual Studio Code**, Microsoft’s modern code editor.
 
 ```bash
 # Anaconda
@@ -281,7 +280,7 @@ cd ~ && wget https://repo.anaconda.com/archive/Anaconda3-2024.10-1-Linux-x86_64.
 bash anaconda.sh -b -p $HOME/anaconda3
 echo 'export PATH="$HOME/anaconda3/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
 
-# VTM (precisa ter Rust instalado antes)
+# VTM (needs rust installed)
 cargo install vtm
 # uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -293,7 +292,7 @@ sudo dnf install -y https://go.microsoft.com/fwlink/?LinkID=760867
 
 ---
 
-## Bibliotecas Python
+## Python Libraries
 
 ```bash
 pip3 install jedi black ruff ipython --user
@@ -303,164 +302,168 @@ pip3 install jedi black ruff ipython --user
 
 ## VSCode Plugins
 
-#### Aparência e Temas
+#### Appearance & Themes
 
-- **pkief.material-icon-theme** → Ícones de arquivos estilo Material.
+- **pkief.material-icon-theme** → Material-style file icons.
   
-- **naumovs.color-highlight** → Destaca cores (#fff, rgb, etc.).
+- **naumovs.color-highlight** → Highlights colors (#fff, rgb, etc.).
   
 
-### Produtividade e Utilidades
+### Productivity & Utilities
 
-- **aaron-bond.better-comments** → Comentários coloridos e destacados.
+- **aaron-bond.better-comments** → Colorful, highlighted comments.
   
-- **alefragnani.bookmarks** → Marcadores no código.
+- **alefragnani.bookmarks** → Bookmarks in code.
   
-- **gruntfuggly.activitusbar** → Customizar a barra lateral de atividades.
+- **gruntfuggly.activitusbar** → Customize the activity bar.
   
-- **sleistner.vscode-fileutils** → Manipulação rápida de arquivos.
+- **sleistner.vscode-fileutils** → Fast file operations.
   
-- **roscop.activefileinstatusbar** → Mostra arquivo ativo na status bar.
+- **roscop.activefileinstatusbar** → Shows active file in status bar.
   
-- **nick-rudenko.back-n-forth** → Navegação rápida entre locais de edição.
+- **nick-rudenko.back-n-forth** → Quick navigation between edit points.
   
-- **sergeyegorov.folder-color** → Mudar cor de pastas no Explorer.
+- **sergeyegorov.folder-color** → Change folder colors in Explorer.
   
-- **mgesbert.indent-nested-dictionary** → Melhor indentação para dicionários.
+- **mgesbert.indent-nested-dictionary** → Better indentation for dictionaries.
   
-- **exodiusstudios.comment-anchors** → Âncoras visuais em comentários.
+- **exodiusstudios.comment-anchors** → Visual anchors in comments.
   
-- **cliffordfajardo.highlight-line-vscode** → Destaca a linha atual.
+- **cliffordfajardo.highlight-line-vscode** → Highlight current line.
   
-- **ryu1kn.text-marker** → Marca palavras/trechos no editor.
+- **ryu1kn.text-marker** → Mark words/snippets in editor.
   
-- **stkb.rewrap** → Quebra de linha inteligente em comentários/texto.
+- **stkb.rewrap** → Smart wrapping for comments/text.
   
-- **shardulm94.trailing-spaces** → Destaca/remover espaços no fim da linha.
+- **shardulm94.trailing-spaces** → Highlight/remove trailing spaces.
   
-- **timonwong.shellcheck** → Integração com ShellCheck (lint bash).
+- **timonwong.shellcheck** → ShellCheck integration (bash lint).
   
-- **tyriar.sort-lines** → Ordenar linhas rapidamente.
+- **tyriar.sort-lines** → Sort lines quickly.
   
-- **mechatroner.rainbow-csv** → Visualização de CSV colorida.
+- **mechatroner.rainbow-csv** → Colorful CSV viewing.
   
-- **bierner.markdown-preview-github-styles** → Preview de Markdown estilo GitHub.
+- **bierner.markdown-preview-github-styles** → GitHub-style Markdown preview.
   
-- **tomoki1207.pdf** → Visualizar PDFs no VS Code.
+- **tomoki1207.pdf** → View PDFs in VS Code.
   
-- **yutengjing.open-in-external-app** → Abrir arquivos em apps externos.
+- **yutengjing.open-in-external-app** → Open files in external apps.
   
-- **yutengjing.vscode-archive** → Abrir arquivos ZIP diretamente.
+- **yutengjing.vscode-archive** → Open ZIP files directly.
   
-- **foxundermoon.shell-format** → Formatador de shell scripts.
+- **foxundermoon.shell-format** → Shell script formatter.
   
-- **sleistner.vscode-fileutils** → Operações rápidas com arquivos.
+- **sleistner.vscode-fileutils** → Quick file ops.
   
-- **christian-kohler.path-intellisense** → Autocompleta nomes de arquivos e paths.
+- **christian-kohler.path-intellisense** → Autocomplete file names/paths.
   
-- **usernamehw.errorlens** → Mostra erros e warnings diretamente no código, sem precisar olhar o painel de problemas.
+- **usernamehw.errorlens** → Show errors/warnings inline without the Problems panel.
   
 
 ### Python
 
-- **ms-python.python** → Suporte principal ao Python.
+- **ms-python.python** → Main Python support.
   
-- **ms-python.debugpy** → Debug Python.
+- **ms-python.debugpy** → Python debugging.
   
-- **charliermarsh.ruff** → Linter/ferramenta rápida para Python.
+- **charliermarsh.ruff** → Fast linter/tooling for Python.
   
-- **franneck94.vscode-cpython-extension-pack** → Pacote de extensões para C/Python.
+- **franneck94.vscode-cpython-extension-pack** → Extension pack for C/Python.
   
-- **benjamin-simmonds.pythoncpp-debug** → Debug híbrido Python/C++.
+- **benjamin-simmonds.pythoncpp-debug** → Hybrid Python/C++ debugging.
   
-- **ms-python.vscode-pylance**→ Melhor análise estática e IntelliSense para Python.
+- **ms-python.vscode-pylance** → Better static analysis & IntelliSense for Python.
   
-- **ms-toolsai.jupyter** → Suporte a Jupyter notebooks no VS Code.
+- **ms-toolsai.jupyter** → Jupyter notebooks support in VS Code.
   
-- **ms-toolsai.jupyter-keymap** → Atalhos de teclado estilo Jupyter.
+- **ms-toolsai.jupyter-keymap** → Jupyter-style keybindings.
   
-- **ms-toolsai.jupyter-renderers** → Melhor visualização de gráficos no notebook.
+- **ms-toolsai.jupyter-renderers** → Better visualization in notebooks.
   
 
 ### Cython
 
-- **guyskk.language-cython** → Sintaxe Cython.
+- **guyskk.language-cython** → Cython syntax.
   
-- **ktnrg45.vscode-cython** → Outro suporte Cython.
+- **ktnrg45.vscode-cython** → Another Cython support extension.
   
-- **tcwalther.cython** → Extensão Cython extra.
+- **tcwalther.cython** → Extra Cython extension.
   
 
 ### C / C++ / Rust
 
-- **ms-vscode.cpptools** → IntelliSense, debug, CMake etc.
+- **ms-vscode.cpptools** → IntelliSense, debug, CMake, etc.
   
-- **llvm-vs-code-extensions.vscode-clangd** → Suporte a Clangd.
+- **llvm-vs-code-extensions.vscode-clangd** → Clangd support.
   
-- **cmstead.js-codeformer** → Refatoração de JavaScript (útil em C++ também).
+- **cmstead.js-codeformer** → JS refactoring (also handy in C++ workflows).
   
 
 ### Java
 
-- **vscjava.vscode-java-pack** → Pacote completo para Java.
+- **vscjava.vscode-java-pack** → Complete Java pack.
   
-- **vscjava.vscode-java-dependency** → Gerenciamento de dependências Java.
+- **vscjava.vscode-java-dependency** → Dependency management for Java.
   
-- **vscjava.vscode-java-debug** → Debug Java.
+- **vscjava.vscode-java-debug** → Java debugging.
   
-- **vscjava.vscode-maven** → Suporte ao Maven.
-  
-
-### Bancos de dados e Ferramentas Web
-
-- **qwtel.sqlite-viewer** → Visualizar bancos SQLite.
-- **mtxr.sqltools** → Cliente SQL integrado com suporte a PostgreSQL, MySQL, SQLite etc.
-- **ritwickdey.liveserver** → Servidor local para visualizar HTML/CSS/JS ao vivo.
-- **esbenp.prettier-vscode** → Formatador para JS/TS/HTML/CSS.
-
-### Terminais & Shell
-
-- **adrianwilczynski.terminal-commands** → Gerenciar comandos no terminal integrado.
-  
-- **antiantisepticeye.vscode-color-picker** → Selecionar cores.
-  
-- **artdiniz.quitcontrol-vscode** → Controle rápido de fechamento.
-  
-- **foxundermoon.shell-format** → Formatador para shell scripts.
-  
-- **mads-hartmann.bash-ide-vscode** → IDE para Bash.
+- **vscjava.vscode-maven** → Maven support.
   
 
-### AI e Automação
+### Databases & Web Tools
 
-- **codeium.codeium** → Autocompletar com IA.
+- **qwtel.sqlite-viewer** → View SQLite databases.
+  
+- **mtxr.sqltools** → Integrated SQL client for PostgreSQL, MySQL, SQLite, etc.
+  
+- **ritwickdey.liveserver** → Local server for live HTML/CSS/JS preview.
+  
+- **esbenp.prettier-vscode** → Formatter for JS/TS/HTML/CSS.
+  
 
-### Git, Diff e Colaboração
+### Terminals & Shell
 
-- **jinsihou.diff-tool** → Comparar arquivos.
+- **adrianwilczynski.terminal-commands** → Manage terminal commands.
   
-- **l13rary.l13-diff** → Outra ferramenta de diff.
+- **antiantisepticeye.vscode-color-picker** → Color picker.
   
-- **vsls-contrib.gistfs** → Abrir Gists do GitHub como FS.
+- **artdiniz.quitcontrol-vscode** → Quick close control.
   
-- **github.codespaces** → Integração com GitHub Codespaces.
+- **foxundermoon.shell-format** → Shell script formatter.
   
-- **eamodio.gitlens** → Ferramenta avançada para Git (blame, histórico, comparação).
+- **mads-hartmann.bash-ide-vscode** → Bash IDE.
+  
+
+### AI & Automation
+
+- **codeium.codeium** → AI autocompletion.
+
+### Git, Diff & Collaboration
+
+- **jinsihou.diff-tool** → Compare files.
+  
+- **l13rary.l13-diff** → Another diff tool.
+  
+- **vsls-contrib.gistfs** → Open GitHub Gists as a filesystem.
+  
+- **github.codespaces** → GitHub Codespaces integration.
+  
+- **eamodio.gitlens** → Advanced Git tool (blame, history, compare).
   
 
 ### Extras
 
-- **tyriar.luna-paint** → Editor de pixel art.
+- **tyriar.luna-paint** → Pixel art editor.
   
-- **tldraw-org.tldraw-vscode** → Integração com tldraw (diagramas).
+- **tldraw-org.tldraw-vscode** → tldraw (diagrams) integration.
   
-- **tomoki1207.vscode-input-sequence** → Gera sequências de entrada automáticas.
+- **tomoki1207.vscode-input-sequence** → Generate input sequences.
   
-- **guiextensions.tosingleline** → Junta várias linhas em uma só.
+- **guiextensions.tosingleline** → Join multiple lines into one.
   
-- **wscats.command-runner** → Executa comandos pré-configurados.
+- **wscats.command-runner** → Run preconfigured commands.
   
-- **cmstead.js-codeformer** → Refatorador JS.
+- **cmstead.js-codeformer** → JS refactoring.
   
 
 ### Installing plugins
@@ -774,7 +777,7 @@ code --install-extension pkief.material-icon-theme \
 
 ## ENV Launcher
 
-Um script interativo que centraliza a gestão de ambientes Python no Linux. Ele permite criar novos ambientes tanto com **Conda** quanto com **uv**, listar os já existentes, e abrir qualquer um deles diretamente no **VS Code** com o interpretador configurado automaticamente.
+An interactive script that centralizes Python environment management on Linux. It lets you create new environments with **Conda** or **uv**, list existing ones, and open any of them directly in **VS Code** with the interpreter set automatically.
 
 #### ~/condalinux.sh
 
@@ -798,9 +801,9 @@ PY_GLOBAL="$(command -v python3 || true)"
 have() { command -v "$1" >/dev/null 2>&1; }
 ensure_dir() { [ -d "$1" ] || mkdir -p "$1"; }
 msg(){ printf "\n\033[1;36m%s\033[0m\n" "$*"; }
-err(){ printf "\n\033[1;31m[ERRO]\033[0m %s\n" "$*" >&2; }
+err(){ printf "\n\033[1;31m[ERROR]\033[0m %s\n" "$*" >&2; }
 
-# VS Code fora do script -> sempre Python global
+# VS Code outside this script -> always use global Python
 set_vscode_global_python() {
   [ -n "${PY_GLOBAL}" ] || return 0
   ensure_dir "$(dirname "$CODE_USER_SETTINGS")"
@@ -809,18 +812,18 @@ set_vscode_global_python() {
   elif have jq; then
     jq -n --arg p "$PY_GLOBAL" '{ "python.defaultInterpreterPath": $p }' > "$CODE_USER_SETTINGS"
   else
-    # fallback simples (não valida JSON existente)
+    # simple fallback (does not validate existing JSON)
     printf '{\n  "python.defaultInterpreterPath": "%s"\n}\n' "$PY_GLOBAL" > "$CODE_USER_SETTINGS"
   fi
 }
 
-# Cria runner pyexe DENTRO do env (como no seu script original), chamando IPython via VTM
+# Create pyexe runner INSIDE the env (like your original script), launching IPython via VTM
 make_env_pyexe() {
   local env_dir="$1" env_name="$2" pybin="$3"
   local logfile="${env_dir}/ipython.log"
   cat >"${env_dir}/pyexe" <<EOF
 #!/bin/sh
-# Runner IPython dentro do VTM (env: ${env_name})
+# IPython runner inside VTM (env: ${env_name})
 export DONT_PROMPT_WSL_INSTALL=1
 touch _____tmp.py 2>/dev/null
 vtm -r term bash -lc '"${pybin}" -m ipython -i _____tmp.py \
@@ -843,7 +846,7 @@ EOF
   chmod +x "${env_dir}/pyexe"
 }
 
-# Garante ipython no ambiente
+# Ensure ipython is available in the environment
 ensure_ipython() {
   local pybin="$1"
   "$pybin" - <<'PY' || "$pybin" -m pip install -q --upgrade ipython >/dev/null
@@ -852,7 +855,7 @@ sys.exit(0 if importlib.util.find_spec("IPython") else 1)
 PY
 }
 
-# Abre VS Code no env com interpretador fixado no workspace
+# Open VS Code in the env with interpreter pinned at the workspace level
 fix_workspace_interpreter_and_open_code() {
   local env_dir="$1" pybin="$2"
   local vsdir="${env_dir}/.vscode"; local vssettings="${vsdir}/settings.json"
@@ -865,14 +868,14 @@ fix_workspace_interpreter_and_open_code() {
   code "$env_dir" >/dev/null 2>&1 &
 }
 
-# ========== Fluxos ==========
+# ========== Flows ==========
 
-# 0) Python GLOBAL no VTM (sem env)
+# 0) GLOBAL Python in VTM (no env)
 open_global_ipython_vtm() {
-  have vtm || { err "vtm não encontrado (instale com 'cargo install vtm' ou pacote da distro)"; exit 1; }
-  [ -n "$PY_GLOBAL" ] || { err "python3 global não encontrado"; exit 1; }
+  have vtm || { err "vtm not found (install with 'cargo install vtm' or your distro package)"; exit 1; }
+  [ -n "$PY_GLOBAL" ] || { err "global python3 not found"; exit 1; }
   ensure_ipython "$PY_GLOBAL"
-  msg "Abrindo IPython GLOBAL no VTM..."
+  msg "Opening GLOBAL IPython in VTM..."
   vtm -r term bash -lc "'$PY_GLOBAL' -m ipython -i --colors=Linux \
     --HistoryManager.hist_file='${HOME}/ipython_hist.sqlite' \
     --HistoryManager.db_cache_size=0 \
@@ -884,66 +887,66 @@ open_global_ipython_vtm() {
     --InteractiveShell.history_length=100000"
 }
 
-# 1) Criar venv com uv (com pyexe e VS Code)
+# 1) Create venv with uv (with pyexe and VS Code)
 create_uv_env() {
-  have uv || { err "uv não instalado. Ex.: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
+  have uv || { err "uv not installed. E.g.: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
   ensure_dir "$UV_ENVS_DIR"
-  read -rp "Nome do env (uv): " name; [ -n "$name" ] || { err "Nome inválido."; exit 1; }
-  read -rp "Versão do Python (ex.: 3.11) [vazio = padrão]: " pyver || true
+  read -rp "Env name (uv): " name; [ -n "$name" ] || { err "Invalid name."; exit 1; }
+  read -rp "Python version (e.g., 3.11) [empty = default]: " pyver || true
   local env_dir="${UV_ENVS_DIR}/${name}"
-  [ -d "$env_dir" ] && { err "Já existe: ${env_dir}"; exit 1; }
-  msg "Criando env uv '${name}'..."
+  [ -d "$env_dir" ] && { err "Already exists: ${env_dir}"; exit 1; }
+  msg "Creating uv env '${name}'..."
   if [ -n "${pyver:-}" ]; then uv venv --python "python${pyver}" "$env_dir"; else uv venv "$env_dir"; fi
   local pybin="${env_dir}/bin/python"
   "$pybin" -m ensurepip --upgrade >/dev/null 2>&1 || true
   ensure_ipython "$pybin"
   make_env_pyexe "$env_dir" "uv:${name}" "$pybin"
   fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Use: ${env_dir}/pyexe  # para abrir IPython no VTM neste env"
+  msg "Use: ${env_dir}/pyexe  # to open IPython in VTM for this env"
 }
 
-# 2) Criar env com conda (com conda init/activate, pyexe e VS Code)
+# 2) Create env with conda (with conda init/activate, pyexe and VS Code)
 create_conda_env() {
-  have conda || { err "conda não encontrado. Instale Miniconda/Anaconda e rode 'conda init'."; exit 1; }
-  read -rp "Nome do env (conda): " name; [ -n "$name" ] || { err "Nome inválido."; exit 1; }
-  read -rp "Versão do Python (ex.: 3.11): " pyver; [ -n "$pyver" ] || { err "Informe a versão do Python."; exit 1; }
-  msg "Criando env conda '${name}'..."
+  have conda || { err "conda not found. Install Miniconda/Anaconda and run 'conda init'."; exit 1; }
+  read -rp "Env name (conda): " name; [ -n "$name" ] || { err "Invalid name."; exit 1; }
+  read -rp "Python version (e.g., 3.11): " pyver; [ -n "$pyver" ] || { err "Provide a Python version."; exit 1; }
+  msg "Creating conda env '${name}'..."
   conda create -y -n "$name" "python=${pyver}" ipython >/dev/null
   local env_dir="${CONDA_ENVS_DIR}/${name}" pybin="${env_dir}/bin/python"
-  # Garante conda init/activate como no seu fluxo original
+  # Keep conda init/activate behavior from your original flow
   conda init >/dev/null 2>&1 || true
-  # Criar pyexe e abrir Code
+  # Create pyexe and open Code
   make_env_pyexe "$env_dir" "conda:${name}" "$pybin"
   fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Use: ${env_dir}/pyexe  # para abrir IPython no VTM neste env"
+  msg "Use: ${env_dir}/pyexe  # to open IPython in VTM for this env"
 }
 
-# Entrar em env Conda existente (com conda init/activate, pyexe e VS Code)
+# Enter existing Conda env (with conda init/activate, pyexe and VS Code)
 enter_conda_env() {
   local name="$1"
   local env_dir="${CONDA_ENVS_DIR}/${name}"
   local pybin="${env_dir}/bin/python"
-  [ -x "$pybin" ] || { err "Python do env conda '${name}' não encontrado em ${pybin}"; exit 1; }
-  # Preserva seu comportamento: conda init e conda activate no shell interativo do VTM, se quiser
+  [ -x "$pybin" ] || { err "Python for conda env '${name}' not found at ${pybin}"; exit 1; }
+  # Preserve your behavior: conda init and (if desired) conda activate in the VTM shell
   conda init >/dev/null 2>&1 || true
   ensure_ipython "$pybin"
   make_env_pyexe "$env_dir" "conda:${name}" "$pybin"
   fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  # Além do Code, já oferecemos abrir IPython agora:
-  msg "Abrindo IPython no VTM do env conda '${name}'..."
+  # Besides opening Code, also open IPython now:
+  msg "Opening IPython in VTM for conda env '${name}'..."
   "${env_dir}/pyexe"
 }
 
-# Entrar em env uv existente (com pyexe e VS Code)
+# Enter existing uv env (with pyexe and VS Code)
 enter_uv_env() {
   local name="$1"
   local env_dir="${UV_ENVS_DIR}/${name}"
   local pybin="${env_dir}/bin/python"
-  [ -x "$pybin" ] || { err "Python do env uv '${name}' não encontrado em ${pybin}"; exit 1; }
+  [ -x "$pybin" ] || { err "Python for uv env '${name}' not found at ${pybin}"; exit 1; }
   ensure_ipython "$pybin"
   make_env_pyexe "$env_dir" "uv:${name}" "$pybin"
   fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Abrindo IPython no VTM do env uv '${name}'..."
+  msg "Opening IPython in VTM for uv env '${name}'..."
   "${env_dir}/pyexe"
 }
 
@@ -960,9 +963,9 @@ main_menu() {
 
   echo
   echo "==================== CondaLinux Menu ===================="
-  echo "0) Abrir Python GLOBAL (fora de envs) no IPython (via VTM)"
-  echo "1) Criar venv com uv"
-  echo "2) Criar env com conda"
+  echo "0) Open GLOBAL Python (outside envs) in IPython (via VTM)"
+  echo "1) Create venv with uv"
+  echo "2) Create env with conda"
   echo "---------------------------------------------------------"
   local idx=3
   if ((${#conda_envs[@]})); then
@@ -974,8 +977,8 @@ main_menu() {
     for name in "${uv_envs[@]}"; do printf "%d) %s\n" "$idx" "$name"; idx=$((idx+1)); done
   fi
   echo "========================================================="
-  read -rp "Escolha: " choice
-  [[ "$choice" =~ ^[0-9]+$ ]] || { err "Escolha inválida."; exit 1; }
+  read -rp "Choice: " choice
+  [[ "$choice" =~ ^[0-9]+$ ]] || { err "Invalid choice."; exit 1; }
 
   case "$choice" in
     0) open_global_ipython_vtm ;;
@@ -993,7 +996,7 @@ main_menu() {
         enter_uv_env "${uv_envs[$uv_pos]}"
         exit 0
       fi
-      err "Opção fora do intervalo."
+      err "Option out of range."
       exit 1
       ;;
   esac
@@ -1002,7 +1005,7 @@ main_menu() {
 main_menu
 ```
 
-Acesso privilegiado
+Grant execute permission
 
 ```bash
 chmod +x ~/condalinux.sh
