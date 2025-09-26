@@ -267,14 +267,14 @@ sudo dnf install -y fzf ripgrep bat exa unzip
 > Installs all packages at once (except Docker, PlantUML, and MongoDB, which may require extra repositories).
 
 ```bash
-sudo dnf install -y --skip-unavailable development-tools cmake ninja-build clang clang-tools-extra pkg-config bear gdb lcov rpm-build rpmdevtools rust cargo boost-devel gtest-devel gmock-devel shellcheck valgrind strace ltrace perf htop mesa-libGLES-devel mesa-libEGL-devel glm-devel SDL2-devel SDL2_image-devel xorg-x11-utils dbus-devel systemd-devel libcap-devel expat-devel libuuid-devel lxc lxc-devel podman vagrant qemu-kvm virt-manager protobuf-devel protobuf-compiler curl wget httpie nmap wireshark wireshark-cli net-tools iproute mosh gnupg2 sqlite sqlite-devel postgresql postgresql-devel mariadb mariadb-devel redis redis-devel python3-virtualenv python3-venv ipython jupyter-notebook jupyterlab mypy black flake8 isort tk-devel bzip2-devel gdbm-devel libffi-devel xz-devel ncurses-devel readline-devel sqlite-devel zlib-devel openssl-devel doxygen graphviz pandoc fzf ripgrep bat exa unzip nodejs
+sudo dnf install -y --skip-unavailable development-tools cmake ninja-build clang clang-tools-extra pkg-config bear gdb lcov rpm-build rpmdevtools rust cargo boost-devel gtest-devel gmock-devel shellcheck valgrind strace ltrace perf htop mesa-libGLES-devel mesa-libEGL-devel glm-devel SDL2-devel SDL2_image-devel xorg-x11-utils dbus-devel systemd-devel libcap-devel expat-devel libuuid-devel lxc lxc-devel podman vagrant qemu-kvm virt-manager protobuf-devel protobuf-compiler curl wget httpie nmap wireshark wireshark-cli net-tools iproute mosh gnupg2 sqlite sqlite-devel postgresql postgresql-devel mariadb mariadb-devel redis redis-devel python3-virtualenv python3-venv ipython jupyter-notebook jupyterlab mypy black flake8 isort tk-devel bzip2-devel gdbm-devel libffi-devel xz-devel ncurses-devel readline-devel sqlite-devel zlib-devel openssl-devel doxygen graphviz pandoc fzf ripgrep bat exa unzip nodejs git
 ```
 
 ---
 
-## Anaconda, VSCode, uv and VTM
+## Anaconda, VSCode, VTM
 
-This script installs three popular tools on Fedora: **Anaconda**, which provides a complete Python environment with data-science libraries; **VTM**, a terminal manager that can be installed via Cargo (requires Rust installed beforehand); and **Visual Studio Code**, Microsoft’s modern code editor.
+This script installs three popular tools on Fedora: **Anaconda**, which provides a complete Python environment with data-science libraries; **VTM**, a terminal manager; and **Visual Studio Code**, Microsoft’s modern code editor.
 
 ```bash
 # Anaconda
@@ -283,9 +283,13 @@ bash anaconda.sh -b -p $HOME/anaconda3
 echo 'export PATH="$HOME/anaconda3/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
 
 # VTM (needs rust installed)
-cargo install vtm
-# uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+vtm_link="https://github.com/directvt/vtm/releases/download/v0.9.99.70/vtm_linux_x86_64.zip"
+vtm_file="$HOME/vtm_linux_x86_64.zip"
+wget "$vtm_link" -O "$vtm_file"
+
+unzip "$vtm_file"
+tar -xf vtm_linux_x86_64.tar
+sudo ./vtm --install
 
 # VS Code
 sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -309,7 +313,6 @@ pip3 install jedi black ruff ipython --user
 - **pkief.material-icon-theme** → Material-style file icons.
   
 - **naumovs.color-highlight** → Highlights colors (#fff, rgb, etc.).
-  
 
 ### Productivity & Utilities
 
@@ -770,7 +773,7 @@ code --install-extension pkief.material-icon-theme \
 
 ## ENV Launcher
 
-An interactive script that centralizes Python environment management on Linux. It lets you create new environments with **Conda** or **uv**, list existing ones, and open any of them directly in **VS Code** with the interpreter set automatically.
+An interactive script that centralizes Python environment management on Linux. It lets you create new environments with **Conda**, list existing ones, and open any of them directly in **VS Code** with the interpreter set automatically.
 
 #### ~/condalinux.sh
 
@@ -781,225 +784,121 @@ vim ~/condalinux.sh
 #### content of ~/condalinux.sh
 
 ```bash
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-# ========== Config ==========
-CONDA_ENVS_DIR="${HOME}/anaconda3/envs"
-UV_ENVS_DIR="${HOME}/uv-envs"
-CODE_USER_SETTINGS="${HOME}/.config/Code/User/settings.json"
-PY_GLOBAL="$(command -v python3 || true)"
+folderPath="$HOME/anaconda3/envs"
 
-# ========== Utils ==========
-have() { command -v "$1" >/dev/null 2>&1; }
-ensure_dir() { [ -d "$1" ] || mkdir -p "$1"; }
-msg(){ printf "\n\033[1;36m%s\033[0m\n" "$*"; }
-err(){ printf "\n\033[1;31m[ERROR]\033[0m %s\n" "$*" >&2; }
+# Lista envs como nomes simples (sem caminho)
+mapfile -t envs < <(find "$folderPath" -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort)
 
-# VS Code outside this script -> always use global Python
-set_vscode_global_python() {
-  [ -n "${PY_GLOBAL}" ] || return 0
-  ensure_dir "$(dirname "$CODE_USER_SETTINGS")"
-  if have jq && [ -f "$CODE_USER_SETTINGS" ]; then
-    tmp="$(mktemp)"; jq --arg p "$PY_GLOBAL" '. + {"python.defaultInterpreterPath": $p}' "$CODE_USER_SETTINGS" > "$tmp" || true; mv "$tmp" "$CODE_USER_SETTINGS"
-  elif have jq; then
-    jq -n --arg p "$PY_GLOBAL" '{ "python.defaultInterpreterPath": $p }' > "$CODE_USER_SETTINGS"
+# Construção do menu
+echo "0. Create new env"
+i=1
+for name in "${envs[@]}"; do
+  echo "$i. $name"
+  ((i++))
+done
+max_index=$(( ${#envs[@]} ))  # último índice de escolha
+
+# Lê escolha
+choice=""
+while [[ -z "${choice:-}" ]]; do
+  read -rp "Enter your choice: " input
+  if [[ "$input" =~ ^[0-9]+$ && "$input" -le "$max_index" ]]; then
+    choice="$input"
+  fi
+done
+
+# Função: carregar hook do conda neste shell
+ensure_conda_hook() {
+  if ! command -v conda >/dev/null 2>&1; then
+    if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+      . "$HOME/anaconda3/etc/profile.d/conda.sh"
+    else
+      eval "$($HOME/anaconda3/bin/conda shell.bash hook)"
+    fi
   else
-    # simple fallback (does not validate existing JSON)
-    printf '{\n  "python.defaultInterpreterPath": "%s"\n}\n' "$PY_GLOBAL" > "$CODE_USER_SETTINGS"
+    eval "$(conda shell.bash hook)"
   fi
 }
 
-# Create pyexe runner INSIDE the env (like your original script), launching IPython via VTM
-make_env_pyexe() {
-  local env_dir="$1" env_name="$2" pybin="$3"
-  local logfile="${env_dir}/ipython.log"
+if [[ "$choice" -eq 0 ]]; then
+  read -rp "Name of new env: " envname
+  read -rp "Python version (ex: 3.11): " pyversion
+  read -rp "Packages to install (space-separated): " packages
+
+  ensure_conda_hook
+  # Não é preciso ajustar canais toda vez; faça isso uma vez fora do script, se quiser.
+  conda create -y -n "$envname" "python=$pyversion" pip ipython $packages
+
+  env_dir="$folderPath/$envname"
+  logfile="${env_dir}/ipythonlog.log"
+
   cat >"${env_dir}/pyexe" <<EOF
 #!/bin/sh
-# IPython runner inside VTM (env: ${env_name})
-export DONT_PROMPT_WSL_INSTALL=1
-touch _____tmp.py 2>/dev/null
-vtm -r term bash -lc '"${pybin}" -m ipython -i _____tmp.py \
-  --colors=Linux \
+# executa ipython dentro do env sem precisar ativar
+conda run -n "$envname" ipython -i _____tmp.py -c="run \$1" \
   --Completer.use_jedi=True \
   --Completer.greedy=True \
   --Completer.suppress_competing_matchers=True \
   --Completer.limit_to__all__=False \
   --Completer.jedi_compute_type_timeout=10000 \
-  --HistoryManager.hist_file="${HOME}/ipython_hist.sqlite" \
+  --Completer.evaluation='dangerous' \
+  --Completer.auto_close_dict_keys=True \
+  --PlainTextFormatter.max_width=9999 \
+  --HistoryManager.hist_file="\$HOME/ipython_hist.sqlite" \
   --HistoryManager.db_cache_size=0 \
-  --TerminalInteractiveShell.xmode=Verbose \
-  --TerminalInteractiveShell.space_for_menu=40 \
+  --TerminalInteractiveShell.xmode='Verbose' \
+  --TerminalInteractiveShell.space_for_menu=20 \
   --TerminalInteractiveShell.history_load_length=10000 \
   --TerminalInteractiveShell.history_length=100000 \
+  --TerminalInteractiveShell.display_page=True \
+  --TerminalInteractiveShell.autoformatter='black' \
+  --TerminalInteractiveShell.auto_match=True \
+  --logappend="$logfile" \
+  --logfile="$logfile" \
   --InteractiveShell.history_load_length=10000 \
   --InteractiveShell.history_length=100000 \
-  --logappend="${logfile}" --logfile="${logfile}"'
+  --cache-size=100000 \
+  --BaseIPythonApplication.log_level=30 \
+  --colors=Linux
 EOF
   chmod +x "${env_dir}/pyexe"
-}
+  echo "Env '$envname' criado. Executável helper: ${env_dir}/pyexe"
 
-# Ensure ipython is available in the environment
-ensure_ipython() {
-  local pybin="$1"
-  "$pybin" - <<'PY' || "$pybin" -m pip install -q --upgrade ipython >/dev/null
-import importlib, sys
-sys.exit(0 if importlib.util.find_spec("IPython") else 1)
-PY
-}
+else
+  # Escolha de um env existente
+  selected="${envs[$((choice-1))]}"
+  echo "You chose: $selected"
 
-# Open VS Code in the env with interpreter pinned at the workspace level
-fix_workspace_interpreter_and_open_code() {
-  local env_dir="$1" pybin="$2"
-  local vsdir="${env_dir}/.vscode"; local vssettings="${vsdir}/settings.json"
-  ensure_dir "$vsdir"
-  if have jq && [ -f "$vssettings" ]; then
-    tmp="$(mktemp)"; jq --arg p "$pybin" '. + {"python.defaultInterpreterPath": $p}' "$vssettings" > "$tmp" || true; mv "$tmp" "$vssettings"
-  else
-    printf '{\n  "python.defaultInterpreterPath": "%s"\n}\n' "$pybin" > "$vssettings"
-  fi
-  code "$env_dir" >/dev/null 2>&1 &
-}
+  # a) Ativar no shell ATUAL (se rodar com 'source condalinux.sh')
+  ensure_conda_hook
+  conda activate "$selected"
 
-# ========== Flows ==========
+  # b) Abrir VSCode usando o Python do env sem ativar (opcional):
+  # conda run -n "$selected" code "$folderPath/$selected"
 
-# 0) GLOBAL Python in VTM (no env)
-open_global_ipython_vtm() {
-  have vtm || { err "vtm not found (install with 'cargo install vtm' or your distro package)"; exit 1; }
-  [ -n "$PY_GLOBAL" ] || { err "global python3 not found"; exit 1; }
-  ensure_ipython "$PY_GLOBAL"
-  msg "Opening GLOBAL IPython in VTM..."
-  vtm -r term bash -lc "'$PY_GLOBAL' -m ipython -i --colors=Linux \
-    --HistoryManager.hist_file='${HOME}/ipython_hist.sqlite' \
-    --HistoryManager.db_cache_size=0 \
-    --TerminalInteractiveShell.xmode=Verbose \
-    --TerminalInteractiveShell.space_for_menu=40 \
-    --TerminalInteractiveShell.history_load_length=10000 \
-    --TerminalInteractiveShell.history_length=100000 \
-    --InteractiveShell.history_load_length=10000 \
-    --InteractiveShell.history_length=100000"
-}
+  # c) Abrir novo terminal com o env ativo (opcional):
+  # gnome-terminal -- bash -ic "eval \"\$(conda shell.bash hook)\"; conda activate \"$selected\"; exec bash"
+fi
 
-# 1) Create venv with uv (with pyexe and VS Code)
-create_uv_env() {
-  have uv || { err "uv not installed. E.g.: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
-  ensure_dir "$UV_ENVS_DIR"
-  read -rp "Env name (uv): " name; [ -n "$name" ] || { err "Invalid name."; exit 1; }
-  read -rp "Python version (e.g., 3.11) [empty = default]: " pyver || true
-  local env_dir="${UV_ENVS_DIR}/${name}"
-  [ -d "$env_dir" ] && { err "Already exists: ${env_dir}"; exit 1; }
-  msg "Creating uv env '${name}'..."
-  if [ -n "${pyver:-}" ]; then uv venv --python "python${pyver}" "$env_dir"; else uv venv "$env_dir"; fi
-  local pybin="${env_dir}/bin/python"
-  "$pybin" -m ensurepip --upgrade >/dev/null 2>&1 || true
-  ensure_ipython "$pybin"
-  make_env_pyexe "$env_dir" "uv:${name}" "$pybin"
-  fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Use: ${env_dir}/pyexe  # to open IPython in VTM for this env"
-}
-
-# 2) Create env with conda (with conda init/activate, pyexe and VS Code)
-create_conda_env() {
-  have conda || { err "conda not found. Install Miniconda/Anaconda and run 'conda init'."; exit 1; }
-  read -rp "Env name (conda): " name; [ -n "$name" ] || { err "Invalid name."; exit 1; }
-  read -rp "Python version (e.g., 3.11): " pyver; [ -n "$pyver" ] || { err "Provide a Python version."; exit 1; }
-  msg "Creating conda env '${name}'..."
-  conda create -y -n "$name" "python=${pyver}" ipython >/dev/null
-  local env_dir="${CONDA_ENVS_DIR}/${name}" pybin="${env_dir}/bin/python"
-  # Keep conda init/activate behavior from your original flow
-  conda init >/dev/null 2>&1 || true
-  # Create pyexe and open Code
-  make_env_pyexe "$env_dir" "conda:${name}" "$pybin"
-  fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Use: ${env_dir}/pyexe  # to open IPython in VTM for this env"
-}
-
-# Enter existing Conda env (with conda init/activate, pyexe and VS Code)
-enter_conda_env() {
-  local name="$1"
-  local env_dir="${CONDA_ENVS_DIR}/${name}"
-  local pybin="${env_dir}/bin/python"
-  [ -x "$pybin" ] || { err "Python for conda env '${name}' not found at ${pybin}"; exit 1; }
-  # Preserve your behavior: conda init and (if desired) conda activate in the VTM shell
-  conda init >/dev/null 2>&1 || true
-  ensure_ipython "$pybin"
-  make_env_pyexe "$env_dir" "conda:${name}" "$pybin"
-  fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  # Besides opening Code, also open IPython now:
-  msg "Opening IPython in VTM for conda env '${name}'..."
-  "${env_dir}/pyexe"
-}
-
-# Enter existing uv env (with pyexe and VS Code)
-enter_uv_env() {
-  local name="$1"
-  local env_dir="${UV_ENVS_DIR}/${name}"
-  local pybin="${env_dir}/bin/python"
-  [ -x "$pybin" ] || { err "Python for uv env '${name}' not found at ${pybin}"; exit 1; }
-  ensure_ipython "$pybin"
-  make_env_pyexe "$env_dir" "uv:${name}" "$pybin"
-  fix_workspace_interpreter_and_open_code "$env_dir" "$pybin"
-  msg "Opening IPython in VTM for uv env '${name}'..."
-  "${env_dir}/pyexe"
-}
-
-# ========== Menu ==========
-main_menu() {
-  set_vscode_global_python
-
-  local conda_envs=() uv_envs=()
-  if [ -d "$CONDA_ENVS_DIR" ]; then
-    while IFS= read -r d; do conda_envs+=("$(basename "$d")"); done < <(find "$CONDA_ENVS_DIR" -maxdepth 1 -mindepth 1 -type d | sort)
-  fi
-  ensure_dir "$UV_ENVS_DIR"
-  while IFS= read -r d; do uv_envs+=("$(basename "$d")"); done < <(find "$UV_ENVS_DIR" -maxdepth 1 -mindepth 1 -type d | sort)
-
-  echo
-  echo "==================== CondaLinux Menu ===================="
-  echo "0) Open GLOBAL Python (outside envs) in IPython (via VTM)"
-  echo "1) Create venv with uv"
-  echo "2) Create env with conda"
-  echo "---------------------------------------------------------"
-  local idx=3
-  if ((${#conda_envs[@]})); then
-    echo "Conda envs:"
-    for name in "${conda_envs[@]}"; do printf "%d) %s\n" "$idx" "$name"; idx=$((idx+1)); done
-  fi
-  if ((${#uv_envs[@]})); then
-    echo "uv envs:"
-    for name in "${uv_envs[@]}"; do printf "%d) %s\n" "$idx" "$name"; idx=$((idx+1)); done
-  fi
-  echo "========================================================="
-  read -rp "Choice: " choice
-  [[ "$choice" =~ ^[0-9]+$ ]] || { err "Invalid choice."; exit 1; }
-
-  case "$choice" in
-    0) open_global_ipython_vtm ;;
-    1) create_uv_env ;;
-    2) create_conda_env ;;
-    *)
-      local conda_end=$((2 + ${#conda_envs[@]}))
-      if (( choice >= 3 && choice <= conda_end )); then
-        local pos=$((choice - 3))
-        enter_conda_env "${conda_envs[$pos]}"
-        exit 0
-      fi
-      local uv_pos=$((choice - conda_end - 1))
-      if (( uv_pos >= 0 && uv_pos < ${#uv_envs[@]} )); then
-        enter_uv_env "${uv_envs[$uv_pos]}"
-        exit 0
-      fi
-      err "Option out of range."
-      exit 1
-      ;;
-  esac
-}
-
-main_menu
 ```
 
 Grant execute permission
 
 ```bash
 chmod +x ~/condalinux.sh
+```
+
+After open shell in VSCode, remember to activate conda venv with
+
+```bash
+activate conda <env_name>
+```
+
+To acess interative mode in python, run the file with 
+
+```bash
+. pyexe file_name.py
 ```
