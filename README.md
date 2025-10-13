@@ -902,7 +902,7 @@ To acess interative mode in python, run the file with
 ```bash
 . pyexe file_name.py
 ```
-###C onfiguring Terminal
+## Configuring Terminal
 
 1. Install Kitty (terminal emulator)
 ```bash
