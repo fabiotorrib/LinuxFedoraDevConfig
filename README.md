@@ -902,3 +902,55 @@ To acess interative mode in python, run the file with
 ```bash
 . pyexe file_name.py
 ```
+###Configuring Terminal
+
+1. Install Kitty (terminal emulator)
+sudo dnf install kitty
+
+
+Set Kitty as default terminal (KDE Settings → Default Applications → Terminal).
+Or via command:
+
+sudo update-alternatives --config x-terminal-emulator
+
+2. Install Zsh
+sudo dnf install zsh
+chsh -s $(which zsh)   # make zsh default
+
+
+If chsh doesn’t work, add this to ~/.bash_profile:
+
+if [ -t 1 ] && [ -x /usr/bin/zsh ]; then
+  exec /usr/bin/zsh -l
+fi
+
+
+Reboot or log out/in.
+
+3. Install Oh My Zsh
+sudo dnf install git curl -y
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+4. Add fzf
+sudo dnf install fzf
+echo '[ -f /usr/share/fzf/shell/key-bindings.zsh ] && source /usr/share/fzf/shell/key-bindings.zsh' >> ~/.zshrc
+autoload -Uz compinit && compinit
+
+5. Add fzf-tab (suggestions in a navegable pop-up)
+git clone https://github.com/Aloxaf/fzf-tab ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/fzf-tab
+
+6. Add highlighting (red color word means incorrect command)
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \
+  ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+7. Enable Plugins
+
+Edit ~/.zshrc → add:
+
+plugins=(git fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting)
+
+
+Reload Zsh:
+
+exec zsh -l
+
