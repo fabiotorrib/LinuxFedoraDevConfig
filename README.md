@@ -785,120 +785,83 @@ vim ~/condalinux.sh
 
 ```bash
 #!/bin/bash
-set -euo pipefail
 
 folderPath="$HOME/anaconda3/envs"
+all_envs="$(find "$folderPath" -maxdepth 1 -mindepth 1 -type d | grep -oE "/[^/]+$" | cut -c 2-)"
+all_envs="Create new env
+$all_envs"
 
-# --- garante que 'conda init' exista (idempotente) ---
-ensure_conda_initialized() {
-  if ! command -v conda >/dev/null 2>&1; then
-    if [[ -x "$HOME/anaconda3/bin/conda" ]]; then
-      "$HOME/anaconda3/bin/conda" init bash >/dev/null 2>&1 || true
-      "$HOME/anaconda3/bin/conda" init zsh  >/dev/null 2>&1 || true
-      "$HOME/anaconda3/bin/conda" init fish >/dev/null 2>&1 || true
-    fi
-  fi
-}
-
-# --- carrega o hook do conda neste shell ---
-ensure_conda_hook() {
-  if ! command -v conda >/dev/null 2>&1; then
-    if [[ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]]; then
-      . "$HOME/anaconda3/etc/profile.d/conda.sh"
-    else
-      eval "$("$HOME/anaconda3/bin/conda" shell.bash hook)"
-    fi
-  else
-    eval "$(conda shell.bash hook)"
-  fi
-}
-
-ensure_conda_initialized
-
-# ---- coleta de envs ----
-mapfile -t envs < <(find "$folderPath" -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort)
-
-all_envs=("Create new env")
-for e in "${envs[@]}"; do all_envs+=("$e"); done
-
-for i in "${!all_envs[@]}"; do
-  echo "$i. ${all_envs[$i]}"
+counter=0
+for i in $(seq 1 $(printf "%s\n" "$all_envs" | wc -l)); do
+    line="$(printf "%s\n" "$all_envs" | sed -n "$i"p)"
+    echo "$counter. $line"
+    counter=$((counter + 1))
 done
-max_index=$(( ${#all_envs[@]} - 1 ))
+counter=$((counter - 1))
 
-choice=""
-while [[ -z "${choice:-}" ]]; do
-  read -rp "Enter your choice: " input
-  if [[ "$input" =~ ^[0-9]+$ && "$input" -ge 0 && "$input" -le "$max_index" ]]; then
-    choice="$input"
-  fi
+input_as_number=""
+while [[ -z "$input_as_number" ]]; do
+    read -p "Enter your choice: " input
+    if [[ "$input" =~ ^[0-9]+$ && "$input" -le "$counter" ]]; then
+        input_as_number="$input"
+    fi
 done
 
-if [[ "$choice" -eq 0 ]]; then
-  read -rp "Name of new env: " envname
-  read -rp "Python version (ex: 3.11): " pyversion
-  read -rp "Packages to install (space-separated): " packages
+if [[ "$input_as_number" -eq 0 ]]; then
+    read -p "Name of new env: " envname
+    read -p "Python version: " pyversion
+    read -p "Packages to install (space-separated): " packages
 
-  ensure_conda_hook
-  conda create -y -n "$envname" "python=$pyversion" pip ipython $packages
+    conda config --prepend channels defaults
+    conda config --set channel_priority disabled
+    conda create -y -n "$envname" python="$pyversion" pip ipython $packages
 
-  env_dir="$folderPath/$envname"
-  logfile="${env_dir}/ipythonlog.log"
+    env_dir="$folderPath/$envname"
+    logfile="${env_dir}/ipythonlog.log"
 
-  cat >"${env_dir}/pyexe" <<'EOF'
+    cat >"${env_dir}/pyexe" <<EOF
 #!/bin/sh
-ENV_NAME="@ENV_NAME@"
-LOG_FILE="@LOG_FILE@"
-TMP_FILE="_____tmp.py"
-[ -f "$TMP_FILE" ] || : > "$TMP_FILE"
-
-if command -v vtm >/dev/null 2>&1; then
-  vtm -r term bash -lc "
-    if ! command -v conda >/dev/null 2>&1; then
-      if [ -f \"$HOME/anaconda3/etc/profile.d/conda.sh\" ]; then
-        . \"$HOME/anaconda3/etc/profile.d/conda.sh\"
-      else
-        eval \"\$(\$HOME/anaconda3/bin/conda shell.bash hook)\"
-      fi
-    else
-      eval \"\$(conda shell.bash hook)\"
-    fi
-    conda activate \"$ENV_NAME\" >/dev/null 2>&1
-    ipython -i \"$TMP_FILE\" \"$@\" --colors=Linux
-  "
-else
-  echo "vtm não encontrado. Instale o VTM ou adicione ao PATH." >&2
-  exit 127
-fi
+touch _____tmp.py
+conda deactivate
+conda activate $envname
+vtm -r term bash -c "ipython -i _____tmp.py -c=\"run \$1\" \
+  --Completer.use_jedi=True --Completer.greedy=True \
+  --Completer.suppress_competing_matchers=True \
+  --Completer.limit_to__all__=False \
+  --Completer.jedi_compute_type_timeout=10000 \
+  --Completer.evaluation='dangerous' \
+  --Completer.auto_close_dict_keys=True \
+  --PlainTextFormatter.max_width=9999 \
+  --HistoryManager.hist_file=\"~/ipython_hist.sqlite\" \
+  --HistoryManager.db_cache_size=0 \
+  --TerminalInteractiveShell.xmode='Verbose' \
+  --TerminalInteractiveShell.space_for_menu=20 \
+  --TerminalInteractiveShell.history_load_length=10000 \
+  --TerminalInteractiveShell.history_length=100000 \
+  --TerminalInteractiveShell.display_page=True \
+  --TerminalInteractiveShell.autoformatter='black' \
+  --TerminalInteractiveShell.auto_match=True \
+  --logappend=\"$logfile\" \
+  --logfile=\"$logfile\" \
+  --InteractiveShell.history_load_length=10000 \
+  --InteractiveShell.history_length=100000 \
+  --cache-size=100000 \
+  --BaseIPythonApplication.log_level=30 \
+  --colors=Linux"
 EOF
-
-  sed -i "s|@ENV_NAME@|$envname|g" "${env_dir}/pyexe"
-  sed -i "s|@LOG_FILE@|$logfile|g" "${env_dir}/pyexe"
-  chmod +x "${env_dir}/pyexe"
-
-  echo "✅ Env '$envname' criado."
-  echo "   Helper: ${env_dir}/pyexe"
+    chmod +x "${env_dir}/pyexe"
 
 else
-  selected="${all_envs[$choice]}"
-  echo "You chose: $selected"
+    input_as_number=$((input_as_number + 1))
+    selected="$(printf "%s\n" "$all_envs" | sed -n "$input_as_number"p)"
+    echo "You chose: $selected"
+    cd "$folderPath/$selected"
 
-  env_dir="$folderPath/$selected"
-  ensure_conda_hook
-  conda activate "$selected"
-  export DONT_PROMPT_WSL_INSTALL=1
-
-  # abre VSCode dentro do env ativo — o terminal interno já herda a ativação
-  if command -v code >/dev/null 2>&1; then
-    code "$env_dir" >/dev/null 2>&1 || true
-  fi
-
-  cd "$env_dir" || true
-
-  if [[ "${BASH_SOURCE[0]-$0}" == "$0" ]]; then
-    echo "ℹ️  Nota: o ambiente foi ativado para esta sessão."
-    echo "    O VSCode foi aberto com este ambiente ativo no terminal interno."
-  fi
+    # exatamente como o script antigo fazia
+    conda init
+    conda activate "$selected"
+    export DONT_PROMPT_WSL_INSTALL=1
+    code "$folderPath/$selected"
 fi
 
 ```
@@ -918,7 +881,7 @@ activate conda <env_name>
 To acess interative mode in python, run the file with 
 
 ```bash
-. pyexe file_name.py
+./pyexe file_name.py
 ```
 ## Configuring Terminal
 
@@ -970,6 +933,7 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \
 ```bash
 Edit ~/.zshrc → add:
 plugins=(git fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting)
+echo 'export PATH="$HOME/anaconda3/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
 Reload Zsh:
