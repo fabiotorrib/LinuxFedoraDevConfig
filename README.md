@@ -789,39 +789,50 @@ set -euo pipefail
 
 folderPath="$HOME/anaconda3/envs"
 
-# Lista envs como nomes simples (sem caminho)
-mapfile -t envs < <(find "$folderPath" -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort)
-
-# Construção do menu
-echo "0. Create new env"
-i=1
-for name in "${envs[@]}"; do
-  echo "$i. $name"
-  ((i++))
-done
-max_index=$(( ${#envs[@]} ))  # último índice de escolha
-
-# Lê escolha
-choice=""
-while [[ -z "${choice:-}" ]]; do
-  read -rp "Enter your choice: " input
-  if [[ "$input" =~ ^[0-9]+$ && "$input" -le "$max_index" ]]; then
-    choice="$input"
+# --- garante que 'conda init' exista (idempotente) ---
+ensure_conda_initialized() {
+  if ! command -v conda >/dev/null 2>&1; then
+    if [[ -x "$HOME/anaconda3/bin/conda" ]]; then
+      "$HOME/anaconda3/bin/conda" init bash >/dev/null 2>&1 || true
+      "$HOME/anaconda3/bin/conda" init zsh  >/dev/null 2>&1 || true
+      "$HOME/anaconda3/bin/conda" init fish >/dev/null 2>&1 || true
+    fi
   fi
-done
+}
 
-# Função: carregar hook do conda neste shell
+# --- carrega o hook do conda neste shell ---
 ensure_conda_hook() {
   if ! command -v conda >/dev/null 2>&1; then
-    if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    if [[ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]]; then
       . "$HOME/anaconda3/etc/profile.d/conda.sh"
     else
-      eval "$($HOME/anaconda3/bin/conda shell.bash hook)"
+      eval "$("$HOME/anaconda3/bin/conda" shell.bash hook)"
     fi
   else
     eval "$(conda shell.bash hook)"
   fi
 }
+
+ensure_conda_initialized
+
+# ---- coleta de envs ----
+mapfile -t envs < <(find "$folderPath" -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort)
+
+all_envs=("Create new env")
+for e in "${envs[@]}"; do all_envs+=("$e"); done
+
+for i in "${!all_envs[@]}"; do
+  echo "$i. ${all_envs[$i]}"
+done
+max_index=$(( ${#all_envs[@]} - 1 ))
+
+choice=""
+while [[ -z "${choice:-}" ]]; do
+  read -rp "Enter your choice: " input
+  if [[ "$input" =~ ^[0-9]+$ && "$input" -ge 0 && "$input" -le "$max_index" ]]; then
+    choice="$input"
+  fi
+done
 
 if [[ "$choice" -eq 0 ]]; then
   read -rp "Name of new env: " envname
@@ -829,58 +840,65 @@ if [[ "$choice" -eq 0 ]]; then
   read -rp "Packages to install (space-separated): " packages
 
   ensure_conda_hook
-  # Não é preciso ajustar canais toda vez; faça isso uma vez fora do script, se quiser.
   conda create -y -n "$envname" "python=$pyversion" pip ipython $packages
 
   env_dir="$folderPath/$envname"
   logfile="${env_dir}/ipythonlog.log"
 
-  cat >"${env_dir}/pyexe" <<EOF
+  cat >"${env_dir}/pyexe" <<'EOF'
 #!/bin/sh
-# executa ipython dentro do env sem precisar ativar
-conda run -n "$envname" ipython -i _____tmp.py -c="run \$1" \
-  --Completer.use_jedi=True \
-  --Completer.greedy=True \
-  --Completer.suppress_competing_matchers=True \
-  --Completer.limit_to__all__=False \
-  --Completer.jedi_compute_type_timeout=10000 \
-  --Completer.evaluation='dangerous' \
-  --Completer.auto_close_dict_keys=True \
-  --PlainTextFormatter.max_width=9999 \
-  --HistoryManager.hist_file="\$HOME/ipython_hist.sqlite" \
-  --HistoryManager.db_cache_size=0 \
-  --TerminalInteractiveShell.xmode='Verbose' \
-  --TerminalInteractiveShell.space_for_menu=20 \
-  --TerminalInteractiveShell.history_load_length=10000 \
-  --TerminalInteractiveShell.history_length=100000 \
-  --TerminalInteractiveShell.display_page=True \
-  --TerminalInteractiveShell.autoformatter='black' \
-  --TerminalInteractiveShell.auto_match=True \
-  --logappend="$logfile" \
-  --logfile="$logfile" \
-  --InteractiveShell.history_load_length=10000 \
-  --InteractiveShell.history_length=100000 \
-  --cache-size=100000 \
-  --BaseIPythonApplication.log_level=30 \
-  --colors=Linux
+ENV_NAME="@ENV_NAME@"
+LOG_FILE="@LOG_FILE@"
+TMP_FILE="_____tmp.py"
+[ -f "$TMP_FILE" ] || : > "$TMP_FILE"
+
+if command -v vtm >/dev/null 2>&1; then
+  vtm -r term bash -lc "
+    if ! command -v conda >/dev/null 2>&1; then
+      if [ -f \"$HOME/anaconda3/etc/profile.d/conda.sh\" ]; then
+        . \"$HOME/anaconda3/etc/profile.d/conda.sh\"
+      else
+        eval \"\$(\$HOME/anaconda3/bin/conda shell.bash hook)\"
+      fi
+    else
+      eval \"\$(conda shell.bash hook)\"
+    fi
+    conda activate \"$ENV_NAME\" >/dev/null 2>&1
+    ipython -i \"$TMP_FILE\" \"$@\" --colors=Linux
+  "
+else
+  echo "vtm não encontrado. Instale o VTM ou adicione ao PATH." >&2
+  exit 127
+fi
 EOF
+
+  sed -i "s|@ENV_NAME@|$envname|g" "${env_dir}/pyexe"
+  sed -i "s|@LOG_FILE@|$logfile|g" "${env_dir}/pyexe"
   chmod +x "${env_dir}/pyexe"
-  echo "Env '$envname' criado. Executável helper: ${env_dir}/pyexe"
+
+  echo "✅ Env '$envname' criado."
+  echo "   Helper: ${env_dir}/pyexe"
 
 else
-  # Escolha de um env existente
-  selected="${envs[$((choice-1))]}"
+  selected="${all_envs[$choice]}"
   echo "You chose: $selected"
 
-  # a) Ativar no shell ATUAL (se rodar com 'source condalinux.sh')
+  env_dir="$folderPath/$selected"
   ensure_conda_hook
   conda activate "$selected"
+  export DONT_PROMPT_WSL_INSTALL=1
 
-  # b) Abrir VSCode usando o Python do env sem ativar (opcional):
-  # conda run -n "$selected" code "$folderPath/$selected"
+  # abre VSCode dentro do env ativo — o terminal interno já herda a ativação
+  if command -v code >/dev/null 2>&1; then
+    code "$env_dir" >/dev/null 2>&1 || true
+  fi
 
-  # c) Abrir novo terminal com o env ativo (opcional):
-  # gnome-terminal -- bash -ic "eval \"\$(conda shell.bash hook)\"; conda activate \"$selected\"; exec bash"
+  cd "$env_dir" || true
+
+  if [[ "${BASH_SOURCE[0]-$0}" == "$0" ]]; then
+    echo "ℹ️  Nota: o ambiente foi ativado para esta sessão."
+    echo "    O VSCode foi aberto com este ambiente ativo no terminal interno."
+  fi
 fi
 
 ```
